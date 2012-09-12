@@ -60,7 +60,13 @@ module Qu
           queues.detect {|queue| id = redis.lpop(queue) }
         end
 
-        get(id) if id
+        if id
+          #mark in-progress key
+          redis.sadd("inprogress", "job:#{id}")
+          redis.sadd("job:#{id}:progress", "started: #{Time.now.to_s}")
+          redis.expire("job:#{id}:progress", 86400)
+          get(id)
+        end
       end
 
       def release(payload)
@@ -68,10 +74,19 @@ module Qu
       end
 
       def failed(payload, error)
+        redis.sadd("job:#{payload.id}:progress", "error: #{error.inspect}")
+        completed(payload, false)
         redis.rpush("queue:failed", payload.id)
       end
 
-      def completed(payload)
+      def completed(payload, success = true)
+        #unmark in-progress key
+        redis.srem("inprogress", "job:#{payload.id}")
+        if success
+          redis.sadd("job:#{payload.id}:progress", "succeeded: #{Time.now.to_s}")
+        else
+          redis.sadd("job:#{payload.id}:progress", "failed: #{Time.now.to_s}")
+        end
         redis.del("job:#{payload.id}")
       end
 
