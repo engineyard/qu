@@ -83,7 +83,7 @@ module Qu
         #unmark in-progress key
         redis.srem("inprogress", "job:#{payload.id}")
         if success
-          redis.sadd("job:#{payload.id}:progress", "succeeded: #{Time.now.to_s}")
+          redis.del("job:#{payload.id}:progress")
         else
           redis.sadd("job:#{payload.id}:progress", "failed: #{Time.now.to_s}")
         end
